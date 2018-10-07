@@ -1,0 +1,99 @@
+//面绘制中的轮廓线算法CF
+
+
+
+#include <vtkDICOMImageReader.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkInteractorStyleTrackballCamera.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkActor.h>
+#include <vtkCamera.h>
+#include <vtkPolyDataNormals.h>
+#include <vtkProperty.h>
+#include <vtkContourFilter.h>
+#include <vtkStripper.h>
+#include <vtkImageActor.h>
+#include <vtkInteractorStyle.h>
+
+
+int main()
+{
+
+	
+	 //读取DICOM数据
+	vtkDICOMImageReader   *reader =  vtkDICOMImageReader::New();
+	reader->SetDataByteOrderToLittleEndian();//设置图像数据的字端序转换成小字端序
+	reader->SetDirectoryName("D://DicomImages/Shoulder/");
+	reader->SetDataSpacing(1.0,1.0,0.48);//设置图像像素间距和序列间距
+    	reader->SetDataOrigin(0.0, 0.0, 0.0);//设置基准点
+
+
+	//轮廓连线算法
+	vtkContourFilter *boneExtractor=vtkContourFilter::New() ;
+	boneExtractor->SetInputConnection(reader->GetOutputPort()) ;
+	boneExtractor->SetValue(0,500) ;
+
+	vtkPolyDataNormals *boneNormals=vtkPolyDataNormals::New() ;
+	boneNormals->SetInputConnection(boneExtractor->GetOutputPort()) ;
+	boneNormals->SetFeatureAngle(60.0) ;//法向量
+
+	vtkStripper *boneStripper=vtkStripper::New() ;//三角几何图元
+	boneStripper->SetInputConnection(boneNormals->GetOutputPort()) ;
+
+	vtkPolyDataMapper *boneMapper=vtkPolyDataMapper::New() ;
+	boneMapper->SetInputConnection(boneStripper->GetOutputPort()) ;
+	boneMapper->ScalarVisibilityOff() ;
+
+	vtkActor *bone=vtkActor::New() ;
+	bone->SetMapper(boneMapper) ;
+	bone->GetProperty()->SetDiffuseColor(1,1,1) ;
+	bone->GetProperty()->SetOpacity(1) ;
+
+
+
+	//-----------------------显示三维图像-----------------------------//
+	vtkCamera *aCamera3D=vtkCamera::New() ;
+	aCamera3D->SetViewUp(0,0,-1) ;
+	aCamera3D->SetPosition(0,1,0) ;
+	aCamera3D->SetFocalPoint(0,0,0) ;
+	aCamera3D->ComputeViewPlaneNormal() ;
+
+	vtkRenderer *aRenderer3D=vtkRenderer::New() ;
+
+	aRenderer3D->AddActor(bone) ;
+	aRenderer3D->SetActiveCamera(aCamera3D) ;
+	aRenderer3D->ResetCamera() ;
+	aCamera3D->Dolly(1.5) ;	
+	aRenderer3D->SetBackground(0,0,0) ;
+	aRenderer3D->SetViewport(0.0,0.0,1.0,1.0);
+
+
+	vtkRenderWindow *renWin=vtkRenderWindow::New() ;
+	renWin->AddRenderer(aRenderer3D) ;
+	renWin->SetSize(600,600) ;
+	aRenderer3D->ResetCameraClippingRange() ;
+
+	vtkRenderWindowInteractor *iren=vtkRenderWindowInteractor::New() ;
+	iren->SetRenderWindow(renWin) ;
+	vtkInteractorStyleTrackballCamera *style = vtkInteractorStyleTrackballCamera::New();//交互摄像机
+	iren->SetInteractorStyle(style);
+	iren->Initialize() ;
+	iren->Start() ;
+
+	style->Delete();
+	iren->Delete();
+	aCamera3D->Delete();
+	renWin->Delete();
+	aRenderer3D->Delete();
+
+	bone->Delete();
+	boneMapper->Delete();
+	boneStripper->Delete();
+	boneNormals->Delete();
+	boneExtractor->Delete();
+
+	reader->Delete();
+	return 0 ;
+}
